@@ -1,0 +1,130 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Feb 19 21:48:51 2017
+
+@author: Ilma Israr
+"""
+
+print ()
+
+
+import networkx
+from operator import itemgetter
+import matplotlib.pyplot
+
+# read the data from the amazon-books.txt;
+# populate amazonProducts nested dicitonary;
+# key = ASIN; value = MetaData associated with ASIN
+fhr = open('./amazon-books.txt', 'r', encoding='utf-8', errors='ignore')
+amazonBooks = {}
+fhr.readline()
+for line in fhr:
+    cell = line.split('\t')
+    MetaData = {}
+    MetaData['Id'] = cell[0].strip() 
+    ASIN = cell[1].strip()
+    MetaData['Title'] = cell[2].strip()
+    MetaData['Categories'] = cell[3].strip()
+    MetaData['Group'] = cell[4].strip()
+    MetaData['Copurchased'] = cell[5].strip()
+    MetaData['SalesRank'] = int(cell[6].strip())
+    MetaData['TotalReviews'] = int(cell[7].strip())
+    MetaData['AvgRating'] = float(cell[8].strip())
+    MetaData['DegreeCentrality'] = int(cell[9].strip())
+    MetaData['ClusteringCoeff'] = float(cell[10].strip())
+    amazonBooks[ASIN] = MetaData
+
+fhr.close()
+
+
+# read the data from amazon-books-copurchase.adjlist;
+# assign it to copurchaseGraph weighted Graph;
+# node = ASIN, edge= copurchase, edge weight = category similarity
+fhr=open("amazon-books-copurchase.edgelist", 'rb')
+copurchaseGraph=networkx.read_weighted_edgelist(fhr)
+fhr.close()
+
+# now let's assume a person is considering buying the following book;
+# what else can we recommend to them based on copurchase behavior 
+# we've seen from other users?
+print ("Looking for Recommendations for Customer Purchasing this Book:")
+print ("--------------------------------------------------------------")
+asin =  '0805047905'
+ego = networkx.ego_graph(copurchaseGraph, asin, radius=1)
+
+#getting the edges of asin and also the weight of the edges in the
+#ego_network graph at depth 1
+# storing asin,to_node and edge weights in a nested list
+list_ego__node_depth1=[]
+for f, t, e in ego.edges(data=True):
+    if (f == asin):
+        list_ego__node_depth1.append([f,t,e['weight']])
+
+#list of weights only of ego network nodes 
+list_of_weights = [sub_list[2] for sub_list in list_ego__node_depth1]
+
+
+# creating an island graph with minimum threshold of edge weight as average 
+#of wghts of ego n/w
+island_nodes=[]
+threshold= (sum(list_of_weights)/len(list_of_weights))
+gIslands = networkx.Graph()
+for f, t, e in copurchaseGraph.edges(data=True):
+    if f in asin:
+        if e['weight'] > threshold:
+            island_nodes.append(t)
+            gIslands.add_edge(f,t,e)
+           
+
+# to check what is the average rating in the island graph
+# to check what is the average review in the island graph
+temp_list_rating=[]
+for i in island_nodes:
+    temp_list_rating.append((amazonBooks[i]['AvgRating']))
+avg_rating_island= (sum(temp_list_rating)/len(temp_list_rating))
+
+temp_list_reviews=[]
+for i in island_nodes:
+    temp_list_reviews.append((amazonBooks[i]['TotalReviews']))
+avg_reviews_island= (sum(temp_list_reviews)/len(temp_list_reviews))
+
+
+# Recommending nodes with rating greater than average rating of island n/w
+#recommending nodes with reviews greater than average reviews of island n/w
+# storing these nodes in a list
+top_recommendations=[]
+for i in island_nodes:
+    if(amazonBooks[i]['AvgRating']>avg_rating_island):
+        if(amazonBooks[i]['TotalReviews']>avg_reviews_island):
+            top_recommendations.append(i)
+      
+# final check on sales rank, should not recommend lower sales rank products
+# getting the sales rank of these node and making a nested list with node,sales rank
+nodes_sales_rank=[]
+for i in top_recommendations:
+    nodes_sales_rank.append([i,amazonBooks[i]['SalesRank']])
+
+    
+# sorting this nested list with sales rank as a key
+sorted_nodes_sales_rank=sorted(nodes_sales_rank,key=itemgetter(1))
+
+
+
+# creating a nested list having the top five nodes in terms of sales rank
+# check for length of the list should be 5 else recommend all of these products
+top__five_nodes_sales_rank=[]
+if len(sorted_nodes_sales_rank) < 5:
+    for i in len(sorted_nodes_sales_rank):
+        top__five_nodes_sales_rank.append(sorted_nodes_sales_rank[i])
+else:
+    for i in range(5):
+        top__five_nodes_sales_rank.append(sorted_nodes_sales_rank[i])
+
+# extracting and storing the asin number from the above nested list in a list
+final_nodes = [sub_list[0] for sub_list in top__five_nodes_sales_rank]
+
+
+# Final reccomendation
+print("Recommendation for the book,",amazonBooks[asin]['Title'], "are below:")
+for i in final_nodes:
+    print(amazonBooks[i]['Title'])
