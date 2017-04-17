@@ -1,0 +1,78 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Nov 12 09:43:30 2016
+
+
+"""
+import os
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+
+def main():
+    #The following are used to declare the location of the code-file and data; 
+    # then read from the location declared.
+    dir_loc = os.path.dirname(os.path.realpath(__file__))
+    data_path = os.path.join(dir_loc,'Data')
+    data_read_path = os.path.join(data_path,'Sample_data.csv')
+    data = pd.read_csv(data_read_path)
+    
+    #Data Fields: Player	Pos	Height	Weight	Age
+    #Data is contained in a pandas object
+    data_x = data['Height']
+    data_y = data['Weight']
+    
+    #Here data is placed in a numpy object from pandas
+    x  = data_x.as_matrix()
+    yd = data_y.as_matrix()   
+    
+    #Operation necesaryu to do a regression using statsmodels
+    #Also see:  http://statsmodels.sourceforge.net/devel/regression.html
+    xd = sm.add_constant(x)
+    t_model = sm.OLS(yd, xd)
+    results = t_model.fit()
+    interc, slope = results.params
+    
+    #This is used to obtain the predicted values and errors from the regression
+    y_pred = interc + slope*x
+    residuals = yd - y_pred  
+
+    #Alternatively, the same data can be obtained from the following statsmodels methods
+    #Remember that "results" is a statsmodels object and will give back desired ststs
+    y_pred = results.predict()
+    residuals = results.resid
+    results.summary()
+    r_sq = results.rsquared
+    results.rsquared_adj    
+  
+    
+    
+    #Now lets predict some additional data; first read the new dataset, then edit and input the predictors
+    pred_data_read_path = os.path.join(data_path,'Predict_data.csv')
+    pred_data = pd.read_csv(pred_data_read_path)
+    
+    #Same functions as above
+    pred_x = pred_data['Height']
+    x2     = pred_x.as_matrix()
+    x_pr   = sm.add_constant(x2)
+    y_pred_2 = results.predict(x_pr) 
+    
+    
+    
+    #To finalize, lets make a graph for the regression results:
+    plt.figure()
+    plt.scatter(x, yd, s=30, alpha=0.15, marker='.')
+    plt.plot(x2, y_pred_2, '-r', marker='x')
+    plt.title('Height vs Weight Plot')
+    plt.tick_params(axis='both', which='major')
+    plt.ylabel('Weight')
+    plt.xlabel('Height')
+    
+    fig_text = 'intercept = ' + str(interc) + '\nslope = ' + str(slope) + '\nr-sq = ' + str(r_sq)
+    plt.annotate(fig_text, xy=(0.95, 0.05), xycoords='axes fraction', fontsize=10,horizontalalignment='right', verticalalignment='bottom')
+
+    
+if __name__ == '__main__':
+   main()
+    
